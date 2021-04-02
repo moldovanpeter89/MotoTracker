@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">MotoTracker</string>
+    <string name="title_activity_maps">Control Tower</string>
+    <string name="title_activity_tracker">Tracker</string>
+    <string name="title_activity_dashboard">Dashboard</string>
+    <string name="tracker_description">
+        Before starting the Tracking Service you must provide the Control Tower Phone Number where the tracking data will be sent.\n\n Important Notice: the remote commands will only work on a ROOT-ed device.
+
+    </string>
+    <string name="phone_number_missing">Phone Number is missing.</string>
+    <string name="control_tower_description">
+        Before using the Control Tower to track your Moto, you must provide the Tracing Phone Number.\n\n Tracker Service must be started on the tracking device for receive data and send commands.
+    </string>
+    <string name="permission_rational_msg">Permissions from Application Settings are OFF!</string>
+    <string name="get_current_status">GET CURRENT STATUS</string>
+    <string name="sms_tracking">SMS Tracking</string>
+    <string name="data_location"><![CDATA[Data & Location]]></string>
+    <string name="tracking_options">Tracking Options</string>
+</resources>
