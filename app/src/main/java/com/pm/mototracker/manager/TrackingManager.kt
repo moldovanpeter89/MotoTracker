@@ -1,9 +1,17 @@
 package com.pm.mototracker.manager
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.BatteryManager
 import android.os.Build
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.pm.mototracker.manager.TrackingManager.Companion.TRACKING_VALUE_NEGATIV
+import com.pm.mototracker.manager.TrackingManager.Companion.TRACKING_VALUE_POSITIV
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -13,8 +21,14 @@ import java.io.DataOutputStream
 
 class TrackingManager(private val context: Context) {
     companion object {
-        const val INTERNET_AVAILABLE = 1
-        const val INTERNET_NOT_AVAILABLE = 0
+        const val TRACKING_VALUE_POSITIV = 1
+        const val TRACKING_VALUE_NEGATIV = 0
+    }
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    fun init() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
     }
 
     fun switchMobileDataAndLocation(switchOn: Boolean, listener: (Int) -> Unit) {
@@ -22,7 +36,7 @@ class TrackingManager(private val context: Context) {
         switchLocation(switchOn)
         GlobalScope.launch(Dispatchers.IO) {
             delay(3000L)
-            listener.invoke(if (checkInternet()) INTERNET_AVAILABLE else INTERNET_NOT_AVAILABLE)
+            listener.invoke((checkInternet().toTrackingValue()))
         }
     }
 
@@ -64,19 +78,60 @@ class TrackingManager(private val context: Context) {
     private fun checkInternet(): Boolean {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             val networkInfo = connectivityManager.activeNetworkInfo
             return networkInfo != null && networkInfo.isConnected
         }
+
         val networks = connectivityManager.allNetworks
         var hasInternet = false
+
         if (networks.isNotEmpty()) {
             for (network in networks) {
                 val nc = connectivityManager.getNetworkCapabilities(network)
-                if (nc!!.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) hasInternet =
-                    true
+                if (nc!!.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                    hasInternet = true
             }
         }
+
         return hasInternet
     }
+
+    @SuppressLint("MissingPermission")
+    fun currentStatus(listener: (Int, Int, Int, Int?, Double?, Double?) -> Unit) {
+        val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { ifilter ->
+            context.registerReceiver(null, ifilter)
+        }
+
+        val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+        val isPlugged: Boolean =
+            plugged == BatteryManager.BATTERY_PLUGGED_AC || plugged == BatteryManager.BATTERY_PLUGGED_USB
+
+        val status: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging: Boolean =
+            status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+        val batteryPct: Float? = batteryStatus?.let { intent ->
+            val level: Int = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale: Int = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            level * 100 / scale.toFloat()
+        }
+
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location ->
+                listener.invoke(
+                    checkInternet().toTrackingValue(),
+                    isPlugged.toTrackingValue(),
+                    isCharging.toTrackingValue(),
+                    batteryPct?.toInt(),
+                    location?.latitude,
+                    location?.longitude
+                )
+            }
+    }
+}
+
+fun Boolean.toTrackingValue(): Int {
+    return if (this) TRACKING_VALUE_POSITIV else TRACKING_VALUE_NEGATIV
 }

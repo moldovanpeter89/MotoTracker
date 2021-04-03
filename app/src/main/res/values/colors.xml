@@ -8,6 +8,7 @@
     <color name="primaryTextColor">#ffffff</color>
     <color name="light_gray">#f2f2f7</color>
     <color name="medium_gray">#8e8e93</color>
+    <color name="medium_gray_trans">#bf8e8e93</color>
     <color name="az">#ffcc80</color>
 
 </resources>

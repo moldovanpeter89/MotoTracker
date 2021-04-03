@@ -16,4 +16,8 @@
     <string name="sms_tracking">SMS Tracking</string>
     <string name="data_location"><![CDATA[Data & Location]]></string>
     <string name="tracking_options">Tracking Options</string>
+    <string name="battery">Battery</string>
+    <string name="tracking_device_status">Tracking Device Status</string>
+    <string name="ps_connected">Power Supply Connected.</string>
+    <string name="ps_disconnected">Power Supply Disconnected.</string>
 </resources>

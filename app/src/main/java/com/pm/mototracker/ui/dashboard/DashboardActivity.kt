@@ -35,6 +35,10 @@ class DashboardActivity : BaseActivity<ActivityDashboardBinding, DashboardViewMo
 
     private fun initView() {
         checkPhoneNumberFromStorage()
+        setClickListeners()
+    }
+
+    private fun setClickListeners(){
         with(binding) {
             openControlTower.setOnClickListener {
                 navigateToControlTower()
@@ -48,8 +52,8 @@ class DashboardActivity : BaseActivity<ActivityDashboardBinding, DashboardViewMo
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             permissions.entries.forEach {
-                initView()
             }
+            initView()
         }
 
     private fun checkPermissions() {
