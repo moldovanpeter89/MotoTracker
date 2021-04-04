@@ -1,6 +1,7 @@
 package com.pm.mototracker.manager
 
 import android.util.Log
+import com.pm.mototracker.model.TrackingStatus
 
 class CommandParser {
 
@@ -8,9 +9,9 @@ class CommandParser {
     var commandSmsTrackingListener: ((Boolean) -> Unit)? = null
     var commandCurrentStatusListener: (() -> Unit)? = null
 
-    var ackDataOnListener: ((Int?) -> Unit)? = null
-    var ackDataOffListener: ((Int?) -> Unit)? = null
-    var ackCurrentStatusListener: ((Int, Int, Int, Int?, Double?, Double?) -> Unit)? = null
+    var ackDataOnListener: ((TrackingStatus) -> Unit)? = null
+    var ackDataOffListener: ((TrackingStatus) -> Unit)? = null
+    var ackCurrentStatusListener: ((TrackingStatus) -> Unit)? = null
 
     fun parseCommand(command: String) {
         try {
@@ -51,18 +52,15 @@ class CommandParser {
     }
 
     private fun parseDataOnAck(ack: String) {
-        Log.d("TAG", "###parseDataOnAck: ${ack.toTrackingValues()}")
-        ackDataOnListener?.invoke(ack.toTrackingValues()[2].toInt())
+        ackDataOnListener?.invoke(TrackingStatus(internetAvailability = ack.toTrackingValues()[2].toInt()))
     }
 
     private fun parseDataOffAck(ack: String) {
-        Log.d("TAG", "###parseDataOffAck: ${ack.toTrackingValues()}")
-        ackDataOffListener?.invoke(ack.toTrackingValues()[2].toInt())
+        ackDataOnListener?.invoke(TrackingStatus(internetAvailability = ack.toTrackingValues()[2].toInt()))
     }
 
     private fun parseSmsTrackingOnAck(ack: String) {
         Log.d("TAG", "###parseSmsTrackingOnAck: ${ack.toTrackingValues()}")
-
     }
 
     private fun parseSmsTrackingOffAck(ack: String) {
@@ -79,12 +77,14 @@ class CommandParser {
         val longitude = location[1].toDoubleOrNull()
 
         ackCurrentStatusListener?.invoke(
-            internetAvailable,
-            plugged,
-            charging,
-            batteryLevel,
-            latitude,
-            longitude
+            TrackingStatus(
+                internetAvailable,
+                plugged,
+                charging,
+                batteryLevel,
+                latitude,
+                longitude
+            )
         )
     }
 }

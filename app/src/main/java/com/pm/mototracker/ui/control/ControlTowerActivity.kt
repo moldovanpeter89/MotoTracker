@@ -4,21 +4,21 @@ import android.annotation.SuppressLint
 import android.content.*
 import android.os.Bundle
 import android.provider.Telephony
-import android.util.Log
-import android.util.TypedValue
 import android.view.View
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.pm.mototracker.R
+import com.pm.mototracker.*
 import com.pm.mototracker.common.BaseActivity
 import com.pm.mototracker.databinding.ActivityControlTowerBinding
 import com.pm.mototracker.manager.CommandParser
 import com.pm.mototracker.manager.CommandSender
+import com.pm.mototracker.model.TrackingStatus
 import com.pm.mototracker.ui.tracker.TrackingService
 import com.pm.mototracker.util.PreferenceHelper
 import com.pm.mototracker.util.PreferenceHelper.defaultPrefs
@@ -31,6 +31,7 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
     companion object {
         private const val IC_EXPANDED_ROTATION_DEG = 0F
         private const val IC_COLLAPSED_ROTATION_DEG = 180F
+        private const val MAP_ZOOM = 14.6F
     }
 
     private lateinit var gMap: GoogleMap
@@ -38,6 +39,7 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
     private lateinit var prefHelper: SharedPreferences
     private var trackingPhoneNumber: String? = null
     private val commandParser = CommandParser()
+    private var canSendCommand = true
 
     private val ackReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -95,6 +97,7 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
 
     private fun initView() {
         initMap()
+        initTrackingDeviceStatus()
         initTrackingOptionsDialog()
         setTrackingClickListeners()
     }
@@ -150,9 +153,14 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
                 with(gMap) {
                     if (location != null) {
                         val currentPosition = LatLng(location.latitude, location.longitude)
-                        addMarker(MarkerOptions().position(currentPosition).title("I am here!"))
+                        addMarker(
+                            MarkerOptions()
+                                .position(currentPosition)
+                                .title(getString(R.string.you_are_here))
+                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+                        )
                         moveCamera(CameraUpdateFactory.newLatLng(currentPosition))
-                        animateCamera(CameraUpdateFactory.zoomTo(10f))
+                        animateCamera(CameraUpdateFactory.newLatLngZoom(currentPosition, MAP_ZOOM))
                     }
                 }
             }
@@ -160,46 +168,99 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
 
     private fun setTrackingClickListeners() {
         binding.trackingOptionsDialog.dataSwitch.setOnCheckedChangeListener { _, isChecked ->
-            CommandSender.sendCommand(
-                phoneNumber = trackingPhoneNumber,
-                command = if (isChecked) CommandSender.CMD_DATA_ON else CommandSender.CMD_DATA_OFF
-            )
+            if (canSendCommand) {
+                CommandSender.sendCommand(
+                    phoneNumber = trackingPhoneNumber,
+                    command = if (isChecked) CommandSender.CMD_DATA_ON else CommandSender.CMD_DATA_OFF
+                )
+                binding.trackingStatusProgressbar.visibility = View.VISIBLE
+            }
         }
         binding.trackingOptionsDialog.smsSwitch.setOnCheckedChangeListener { _, isChecked ->
-            CommandSender.sendCommand(
-                phoneNumber = trackingPhoneNumber,
-                command = if (isChecked) CommandSender.CMD_SMS_TRACKING_ON else CommandSender.CMD_SMS_TRACKING_OFF
-            )
+            if (canSendCommand) {
+                CommandSender.sendCommand(
+                    phoneNumber = trackingPhoneNumber,
+                    command = if (isChecked) CommandSender.CMD_SMS_TRACKING_ON else CommandSender.CMD_SMS_TRACKING_OFF
+                )
+                binding.trackingStatusProgressbar.visibility = View.VISIBLE
+            }
         }
         binding.trackingOptionsDialog.currentStatus.setOnClickListener {
             CommandSender.sendCommand(
                 phoneNumber = trackingPhoneNumber,
                 command = CommandSender.CMD_GET_CURRENT_STATUS
             )
+            canSendCommand = false
+            binding.trackingStatusProgressbar.visibility = View.VISIBLE
         }
     }
 
     private fun handleMessage(messageBody: String) {
-        commandParser.ackDataOnListener = { internetAvailability ->
-
+        commandParser.ackDataOnListener = { trackingStatus ->
+            binding.trackingStatusProgressbar.visibility = View.GONE
+            setTrackingDeviceStatus(trackingStatus)
         }
-        commandParser.ackDataOffListener = { internetAvailability ->
-
+        commandParser.ackDataOffListener = { trackingStatus ->
+            binding.trackingStatusProgressbar.visibility = View.GONE
+            setTrackingDeviceStatus(trackingStatus)
         }
-        commandParser.ackCurrentStatusListener =
-            { internetAvailability, plugged, charging, batteryLevel, latitude, longitude ->
-                Log.d(
-                    "TAG",
-                    "##lis: $internetAvailability, $plugged, $charging, $batteryLevel, $latitude,  $longitude"
-                )
-            }
+        commandParser.ackCurrentStatusListener = { trackingStatus ->
+            binding.trackingStatusProgressbar.visibility = View.GONE
+            setTrackingDeviceStatus(trackingStatus)
+        }
 
         commandParser.parseCommand(messageBody)
     }
-}
 
-fun Context.getDimension(value: Float): Int {
-    return TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, value, this.resources.displayMetrics
-    ).toInt()
+    private fun initTrackingDeviceStatus() {
+        binding.trackingStatusPowerSupply.text =
+            getString(R.string.tracking_status_ps, getString(R.string.na))
+        binding.trackingStatusBattery.text = getString(R.string.tracking_status_battery_na)
+        binding.trackingStatusData.text =
+            getString(R.string.tracking_status_data, getString(R.string.na))
+        binding.trackingStatusSmsTracking.text =
+            getString(R.string.tracking_status_sms_tracking, getString(R.string.na))
+    }
+
+    private fun setTrackingDeviceStatus(trackingStatus: TrackingStatus) {
+        addTrackerMarker(trackingStatus)
+
+        binding.trackingOptionsDialog.dataSwitch.isChecked =
+            trackingStatus.internetAvailability?.toTrackingValueBoolean() == true
+
+        trackingStatus.plugged?.let {
+            binding.trackingStatusPowerSupply.text =
+                trackingStatus.plugged.powerSupplyTrackingValueToText(this)
+        }
+        trackingStatus.charging?.let {
+            binding.trackingStatusBattery.text =
+                trackingStatus.charging.batteryLevelTrackingValueToText(
+                    this,
+                    trackingStatus.batteryLevel
+                )
+        }
+        trackingStatus.internetAvailability?.let {
+            binding.trackingStatusData.text =
+                trackingStatus.internetAvailability.dataTrackingValueToText(this)
+        }
+
+        canSendCommand = true
+    }
+
+    private fun addTrackerMarker(trackingStatus: TrackingStatus) {
+        if (trackingStatus.latitude != null && trackingStatus.longitude != null) {
+            val location = LatLng(trackingStatus.latitude, trackingStatus.longitude)
+            with(gMap) {
+                val currentPosition = LatLng(location.latitude, location.longitude)
+                addMarker(
+                    MarkerOptions()
+                        .position(currentPosition)
+                        .title(getString(R.string.moto))
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+                )
+                moveCamera(CameraUpdateFactory.newLatLng(currentPosition))
+                animateCamera(CameraUpdateFactory.newLatLngZoom(currentPosition, MAP_ZOOM))
+            }
+        }
+    }
 }

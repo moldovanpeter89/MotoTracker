@@ -10,8 +10,7 @@ import android.os.BatteryManager
 import android.os.Build
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import com.pm.mototracker.manager.TrackingManager.Companion.TRACKING_VALUE_NEGATIV
-import com.pm.mototracker.manager.TrackingManager.Companion.TRACKING_VALUE_POSITIV
+import com.pm.mototracker.toTrackingValueInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -20,10 +19,6 @@ import java.io.DataOutputStream
 
 
 class TrackingManager(private val context: Context) {
-    companion object {
-        const val TRACKING_VALUE_POSITIV = 1
-        const val TRACKING_VALUE_NEGATIV = 0
-    }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
@@ -36,7 +31,7 @@ class TrackingManager(private val context: Context) {
         switchLocation(switchOn)
         GlobalScope.launch(Dispatchers.IO) {
             delay(3000L)
-            listener.invoke((checkInternet().toTrackingValue()))
+            listener.invoke((checkInternet().toTrackingValueInt()))
         }
     }
 
@@ -121,17 +116,13 @@ class TrackingManager(private val context: Context) {
         fusedLocationClient.lastLocation
             .addOnSuccessListener { location ->
                 listener.invoke(
-                    checkInternet().toTrackingValue(),
-                    isPlugged.toTrackingValue(),
-                    isCharging.toTrackingValue(),
+                    checkInternet().toTrackingValueInt(),
+                    isPlugged.toTrackingValueInt(),
+                    isCharging.toTrackingValueInt(),
                     batteryPct?.toInt(),
                     location?.latitude,
                     location?.longitude
                 )
             }
     }
-}
-
-fun Boolean.toTrackingValue(): Int {
-    return if (this) TRACKING_VALUE_POSITIV else TRACKING_VALUE_NEGATIV
 }

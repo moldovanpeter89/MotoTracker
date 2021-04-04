@@ -26,6 +26,16 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <ProgressBar
+            android:id="@+id/tracking_status_progressbar"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:indeterminateTint="@color/white"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/tracking_status"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <TextView
             android:id="@+id/tracking_status_power_supply"
             android:layout_width="wrap_content"
