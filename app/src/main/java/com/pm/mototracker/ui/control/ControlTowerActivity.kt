@@ -11,6 +11,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.pm.mototracker.*
@@ -251,6 +252,7 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
         if (trackingStatus.latitude != null && trackingStatus.longitude != null) {
             val location = LatLng(trackingStatus.latitude, trackingStatus.longitude)
             with(gMap) {
+                clear()
                 val currentPosition = LatLng(location.latitude, location.longitude)
                 addMarker(
                     MarkerOptions()
