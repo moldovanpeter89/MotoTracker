@@ -11,7 +11,6 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.pm.mototracker.*
@@ -167,7 +166,16 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
             }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setTrackingClickListeners() {
+        binding.trackingOptionsDialog.dataSwitch.setOnTouchListener { v, _ ->
+            canSendCommand = true
+            false
+        }
+        binding.trackingOptionsDialog.smsSwitch.setOnTouchListener { _, _ ->
+            canSendCommand = true
+            false
+        }
         binding.trackingOptionsDialog.dataSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (canSendCommand) {
                 CommandSender.sendCommand(
@@ -198,18 +206,33 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
 
     private fun handleMessage(messageBody: String) {
         commandParser.ackDataOnListener = { trackingStatus ->
-            binding.trackingStatusProgressbar.visibility = View.GONE
+            canSendCommand = false
             setTrackingDeviceStatus(trackingStatus)
         }
         commandParser.ackDataOffListener = { trackingStatus ->
-            binding.trackingStatusProgressbar.visibility = View.GONE
+            canSendCommand = false
+            setTrackingDeviceStatus(trackingStatus)
+        }
+        commandParser.ackSmsTrackingOnListener = {
+            canSendCommand = false
+            setSmsTrackingStatus(smsTrackOn = true)
+        }
+        commandParser.ackSmsTrackingOffListener = {
+            canSendCommand = false
+            setSmsTrackingStatus(smsTrackOn = false)
+        }
+        commandParser.ackSmsTrackingReportListener = { trackingStatus ->
+            canSendCommand = false
+            setSmsTrackingStatus(smsTrackOn = true)
             setTrackingDeviceStatus(trackingStatus)
         }
         commandParser.ackCurrentStatusListener = { trackingStatus ->
-            binding.trackingStatusProgressbar.visibility = View.GONE
+            canSendCommand = false
             setTrackingDeviceStatus(trackingStatus)
         }
-
+        commandParser.psStatusListener = { trackingStatus ->
+            setTrackingDeviceStatus(trackingStatus)
+        }
         commandParser.parseCommand(messageBody)
     }
 
@@ -223,7 +246,15 @@ class ControlTowerActivity : BaseActivity<ActivityControlTowerBinding, ControlTo
             getString(R.string.tracking_status_sms_tracking, getString(R.string.na))
     }
 
+    private fun setSmsTrackingStatus(smsTrackOn: Boolean) {
+        binding.trackingStatusProgressbar.visibility = View.GONE
+        binding.trackingOptionsDialog.smsSwitch.isChecked = smsTrackOn
+        binding.trackingStatusSmsTracking.text = smsTrackOn.smsTrackingValueToText(this)
+    }
+
     private fun setTrackingDeviceStatus(trackingStatus: TrackingStatus) {
+        binding.trackingStatusProgressbar.visibility = View.GONE
+
         addTrackerMarker(trackingStatus)
 
         binding.trackingOptionsDialog.dataSwitch.isChecked =

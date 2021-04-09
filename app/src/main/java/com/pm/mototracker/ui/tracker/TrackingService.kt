@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import android.provider.Telephony
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_MIN
@@ -100,6 +99,7 @@ class TrackingService : Service() {
 
     override fun onDestroy() {
         unregisterReceiver(commandReceiver);
+        prefHelper[PreferenceHelper.SERVICE_STARTED, false]
     }
 
     private fun startForeground() {
@@ -171,7 +171,26 @@ class TrackingService : Service() {
             }
         }
         commandParser.commandSmsTrackingListener = { smsTrackOn ->
-
+            if (smsTrackOn) {
+                CommandSender.sendCommand(
+                    phoneNumber = controlTowerPhoneNumber,
+                    command = CommandSender.ACK_SMS_TRACKING_ON
+                )
+                trackingManager.smsTrackingOn { internetAvailability, plugged, charging, batteryLevel, latitude, longitude ->
+                    val command =
+                        "${CommandSender.ACK_SMS_TRACKING_REPORT}$internetAvailability#$plugged#$charging#$batteryLevel#$latitude@$longitude"
+                    CommandSender.sendCommand(
+                        phoneNumber = controlTowerPhoneNumber,
+                        command = command
+                    )
+                }
+            } else {
+                trackingManager.smsTrackingOff()
+                CommandSender.sendCommand(
+                    phoneNumber = controlTowerPhoneNumber,
+                    command = CommandSender.ACK_SMS_TRACKING_OFF
+                )
+            }
         }
         commandParser.commandCurrentStatusListener = {
             trackingManager.currentStatus { internetAvailability, plugged, charging, batteryLevel, latitude, longitude ->
@@ -180,6 +199,10 @@ class TrackingService : Service() {
                 CommandSender.sendCommand(
                     phoneNumber = controlTowerPhoneNumber,
                     command = command
+                )
+                CommandSender.sendCommand(
+                    phoneNumber = controlTowerPhoneNumber,
+                    command = if (TrackingManager.TIMER_RUNNING) CommandSender.ACK_SMS_TRACKING_ON else CommandSender.ACK_SMS_TRACKING_OFF
                 )
             }
 

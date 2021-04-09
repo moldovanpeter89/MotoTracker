@@ -2,6 +2,7 @@ package com.pm.mototracker
 
 import android.content.Context
 import android.util.TypedValue
+import com.pm.mototracker.manager.CommandParser
 
 const val TRACKING_VALUE_POSITIV = 1
 const val TRACKING_VALUE_NEGATIV = 0
@@ -45,10 +46,10 @@ fun Int.dataTrackingValueToText(context: Context): String {
     )
 }
 
-fun Int.smsTrackingValueToText(context: Context): String {
+fun Boolean.smsTrackingValueToText(context: Context): String {
     return context.getString(
         R.string.tracking_status_sms_tracking,
-        if (this == 1)
+        if (this)
             context.getString(R.string.on)
         else
             context.getString(R.string.off)
@@ -59,4 +60,12 @@ fun Context.getDimension(value: Float): Int {
     return TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, value, this.resources.displayMetrics
     ).toInt()
+}
+
+fun String.toTrackingValues(): List<String> {
+    return this.split(CommandParser.TRACKING_DELIMITER)
+}
+
+fun String.toLocationValues(): List<String> {
+    return this.split(CommandParser.LOCATION_DELIMITER)
 }

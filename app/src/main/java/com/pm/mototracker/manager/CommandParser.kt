@@ -2,8 +2,18 @@ package com.pm.mototracker.manager
 
 import android.util.Log
 import com.pm.mototracker.model.TrackingStatus
+import com.pm.mototracker.toLocationValues
+import com.pm.mototracker.toTrackingValues
 
 class CommandParser {
+
+    companion object {
+        const val TRACKING_DELIMITER = "#"
+        const val LOCATION_DELIMITER = "@"
+        private const val CMD = "CMD"
+        private const val ACK = "ACK"
+        private const val PS_STATUS = "PS_STATUS"
+    }
 
     var commandDataListener: ((Boolean) -> Unit)? = null
     var commandSmsTrackingListener: ((Boolean) -> Unit)? = null
@@ -11,16 +21,28 @@ class CommandParser {
 
     var ackDataOnListener: ((TrackingStatus) -> Unit)? = null
     var ackDataOffListener: ((TrackingStatus) -> Unit)? = null
+    var ackSmsTrackingOnListener: (() -> Unit)? = null
+    var ackSmsTrackingOffListener: (() -> Unit)? = null
+    var ackSmsTrackingReportListener: ((TrackingStatus) -> Unit)? = null
     var ackCurrentStatusListener: ((TrackingStatus) -> Unit)? = null
+    var psStatusListener: ((TrackingStatus) -> Unit)? = null
 
     fun parseCommand(command: String) {
         try {
-            if (command.startsWith("CMD")) {
-                parseCmd(command)
+            when {
+                command.startsWith(CMD) -> {
+                    parseCmd(command)
 
-            } else if (command.startsWith("ACK")) {
-                parseAck(command)
+                }
+                command.startsWith(ACK) -> {
+                    parseAck(command)
+
+                }
+                command.startsWith(PS_STATUS) -> {
+                    parsePsStatus(command)
+                }
             }
+
         } catch (e: Exception) {
             Log.e("TAG", "Parsing failed:", e)
         }
@@ -42,10 +64,12 @@ class CommandParser {
                 parseDataOnAck(ack)
             ack.startsWith(CommandSender.ACK_DATA_OFF) ->
                 parseDataOffAck(ack)
-            ack.startsWith(CommandSender.CMD_SMS_TRACKING_ON) ->
-                parseSmsTrackingOnAck(ack)
-            ack.startsWith(CommandSender.CMD_SMS_TRACKING_OFF) ->
-                parseSmsTrackingOffAck(ack)
+            ack.startsWith(CommandSender.ACK_SMS_TRACKING_ON) ->
+                parseSmsTrackingOnAck()
+            ack.startsWith(CommandSender.ACK_SMS_TRACKING_OFF) ->
+                parseSmsTrackingOffAck()
+            ack.startsWith(CommandSender.ACK_SMS_TRACKING_REPORT) ->
+                parseSmsTrackingReport(ack)
             ack.startsWith(CommandSender.ACK_GET_CURRENT_STATUS) ->
                 parseCurrentStatusAck(ack)
         }
@@ -56,18 +80,34 @@ class CommandParser {
     }
 
     private fun parseDataOffAck(ack: String) {
-        ackDataOnListener?.invoke(TrackingStatus(internetAvailability = ack.toTrackingValues()[2].toInt()))
+        ackDataOffListener?.invoke(TrackingStatus(internetAvailability = ack.toTrackingValues()[2].toInt()))
     }
 
-    private fun parseSmsTrackingOnAck(ack: String) {
-        Log.d("TAG", "###parseSmsTrackingOnAck: ${ack.toTrackingValues()}")
+    private fun parseSmsTrackingOnAck() {
+        ackSmsTrackingOnListener?.invoke()
     }
 
-    private fun parseSmsTrackingOffAck(ack: String) {
-        Log.d("TAG", "###parseSmsTrackingOffAck: ${ack.toTrackingValues()}")
+    private fun parseSmsTrackingOffAck() {
+        ackSmsTrackingOffListener?.invoke()
+    }
+
+    private fun parseSmsTrackingReport(ack: String) {
+        parseTrackingStatus(ack) {
+            ackSmsTrackingReportListener?.invoke(it)
+        }
     }
 
     private fun parseCurrentStatusAck(ack: String) {
+        parseTrackingStatus(ack) {
+            ackCurrentStatusListener?.invoke(it)
+        }
+    }
+
+    private fun parsePsStatus(command: String) {
+        psStatusListener?.invoke(TrackingStatus(plugged = command.toTrackingValues()[1].toInt()))
+    }
+
+    private fun parseTrackingStatus(ack: String, listener: (TrackingStatus) -> Unit) {
         val internetAvailable = ack.toTrackingValues()[2].toInt()
         val plugged = ack.toTrackingValues()[3].toInt()
         val charging = ack.toTrackingValues()[4].toInt()
@@ -76,7 +116,7 @@ class CommandParser {
         val latitude = location[0].toDoubleOrNull()
         val longitude = location[1].toDoubleOrNull()
 
-        ackCurrentStatusListener?.invoke(
+        listener.invoke(
             TrackingStatus(
                 internetAvailable,
                 plugged,
@@ -87,12 +127,4 @@ class CommandParser {
             )
         )
     }
-}
-
-fun String.toTrackingValues(): List<String> {
-    return this.split("#")
-}
-
-fun String.toLocationValues(): List<String> {
-    return this.split("@")
 }

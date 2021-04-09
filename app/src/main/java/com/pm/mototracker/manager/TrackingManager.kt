@@ -8,6 +8,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
+import android.os.CountDownTimer
+import android.util.Log
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.pm.mototracker.toTrackingValueInt
@@ -19,8 +21,15 @@ import java.io.DataOutputStream
 
 
 class TrackingManager(private val context: Context) {
+    companion object {
+        var TIMER_RUNNING = false
+        private const val TEST_INTERVAL = 10000L
+        private const val INTERVAL = 1000L * 60
+        private const val DURATION = 1000L * 60 * 60
+    }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var countDownTimer: CountDownTimer? = null
 
     fun init() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
@@ -124,5 +133,35 @@ class TrackingManager(private val context: Context) {
                     location?.longitude
                 )
             }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun smsTrackingOn(
+        listener: (Int, Int, Int, Int?, Double?, Double?) -> Unit
+    ) {
+        Log.d("TAG", "##smsTrackingOn TIMER_RUNNING: $TIMER_RUNNING")
+        if (TIMER_RUNNING.not()) {
+            countDownTimer = object : CountDownTimer(DURATION, INTERVAL) {
+                override fun onTick(millisUntilFinished: Long) {
+                    currentStatus(listener)
+                }
+
+                override fun onFinish() {
+                    //Hack for infinity and beyond Timer
+                    countDownTimer?.start()
+                }
+
+            }
+
+            countDownTimer?.start()
+            TIMER_RUNNING = true
+        }
+    }
+
+    fun smsTrackingOff() {
+        countDownTimer?.cancel()
+        TIMER_RUNNING = false
+        Log.d("TAG", "##smsTrackingOff TIMER_RUNNING: $TIMER_RUNNING")
+
     }
 }
